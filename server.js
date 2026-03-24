@@ -8,7 +8,7 @@ app.use(express.static(path.join(__dirname, 'dist')));
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'responses.json');
-const PASSWORD = 'criticalai2026';
+const PASSWORD = process.env.DASHBOARD_PASSWORD || 'criticalai2026';
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
