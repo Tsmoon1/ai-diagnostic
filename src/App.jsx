@@ -365,7 +365,7 @@ function BarChart({ title, counts, total }) {
   );
 }
 
-function tally(filtered,field) {
+function tally(responses, field) {
   const counts = {};
   responses.forEach((r) => {
     const val = r[field];
