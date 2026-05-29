@@ -222,7 +222,7 @@ const SECTIONS = [
     tag: 'Section 4 of 4',
     title: 'Where you\'re headed',
     subtitle: "Help me understand your goals so this course can actually serve them.",
-    isValid: (d) => d.careerGoal && d.aiCareerImportance && d.wantToLearn?.length > 0,
+    isValid: (d) => d.careerGoal && d.aiCareerImportance && d.buildAppsInterest && d.wantToLearn?.length > 0,
   },
 ];
 
@@ -314,6 +314,15 @@ function SurveySection({ index, data, update }) {
         />
       </div>
       <div style={s.fieldGroup}>
+        <label style={s.label}>How interested are you in learning to use AI tools like Claude Code or Codex to build your own apps? <span style={{ color: '#e07b00' }}>*</span></label>
+        <ScaleInput
+          value={data.buildAppsInterest}
+          onChange={(v) => update({ buildAppsInterest: v })}
+          lowLabel="Not interested at all"
+          highLabel="Very interested"
+        />
+      </div>
+      <div style={s.fieldGroup}>
         <label style={s.label}>What do you most want to learn in this course? (Select all that apply) <span style={{ color: '#e07b00' }}>*</span></label>
         <CheckGroup options={WANT_TO_LEARN} value={data.wantToLearn} onChange={(v) => update({ wantToLearn: v })} />
       </div>
@@ -356,7 +365,7 @@ function BarChart({ title, counts, total }) {
   );
 }
 
-function tally(responses, field) {
+function tally(filtered,field) {
   const counts = {};
   responses.forEach((r) => {
     const val = r[field];
@@ -383,6 +392,7 @@ function Dashboard({ onBack }) {
   const [responses, setResponses] = useState([]);
   const [tab, setTab] = useState('overview');
   const [loading, setLoading] = useState(false);
+  const [classFilter, setClassFilter] = useState('all');
 
   const login = async () => {
     setLoading(true);
@@ -400,7 +410,8 @@ function Dashboard({ onBack }) {
   };
 
   const downloadCSV = () => {
-    window.location.href = `/api/responses/csv?password=${encodeURIComponent(password)}`;
+    const classParam = classFilter === 'all' ? '' : `&class=${encodeURIComponent(classFilter)}`;
+    window.location.href = `/api/responses/csv?password=${encodeURIComponent(password)}${classParam}`;
   };
 
   if (!authed) return (
@@ -432,9 +443,13 @@ function Dashboard({ onBack }) {
     </div>
   );
 
-  const n = responses.length;
-  const comfortAvg = avg(responses, 'comfortScale');
-  const aiImportanceAvg = avg(responses, 'aiCareerImportance');
+  const classes = [...new Set(responses.map((r) => r.class || 'Unassigned'))].sort();
+  const filtered = classFilter === 'all' ? responses : responses.filter((r) => (r.class || 'Unassigned') === classFilter);
+
+  const n = filtered.length;
+  const comfortAvg = avg(filtered, 'comfortScale');
+  const aiImportanceAvg = avg(filtered, 'aiCareerImportance');
+  const buildAppsAvg = avg(filtered, 'buildAppsInterest');
 
   const tabs = ['overview', 'charts', 'open-responses'];
   const tabLabels = { overview: 'Overview', charts: 'All Charts', 'open-responses': 'Open Responses' };
@@ -454,12 +469,30 @@ function Dashboard({ onBack }) {
           </div>
         </div>
 
+        {/* Class filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          <label style={{ ...s.label, marginBottom: 0 }}>Class:</label>
+          <select
+            style={{ ...s.input, width: 'auto', minWidth: '200px', cursor: 'pointer' }}
+            value={classFilter}
+            onChange={(e) => setClassFilter(e.target.value)}
+          >
+            <option value="all">All classes ({responses.length})</option>
+            {classes.map((c) => (
+              <option key={c} value={c}>
+                {c} ({responses.filter((r) => (r.class || 'Unassigned') === c).length})
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Stats */}
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           {[
             { label: 'Total Responses', val: n },
             { label: 'Avg. Comfort (1–10)', val: n > 0 ? comfortAvg : '—' },
             { label: 'Avg. AI Career Importance', val: n > 0 ? aiImportanceAvg : '—' },
+            { label: 'Avg. Interest: Build Apps', val: n > 0 ? buildAppsAvg : '—' },
           ].map((stat) => (
             <div key={stat.label} style={{ ...s.dashCard, flex: 1, minWidth: '140px', textAlign: 'center', marginBottom: 0 }}>
               <div style={s.statVal}>{stat.val}</div>
@@ -492,26 +525,28 @@ function Dashboard({ onBack }) {
             {/* Overview tab */}
             {tab === 'overview' && (
               <>
-                <BarChart title="Current Role" counts={tally(responses, 'role')} total={n} />
-                <BarChart title="AI Tools Used" counts={tally(responses, 'aiToolsUsed')} total={n} />
-                <BarChart title="Usage Frequency" counts={tally(responses, 'usageFrequency')} total={n} />
-                <BarChart title="Comfort Scale (1–10)" counts={tally(responses, 'comfortScale')} total={n} />
-                <BarChart title="AI Career Importance (1–10)" counts={tally(responses, 'aiCareerImportance')} total={n} />
+                <BarChart title="Current Role" counts={tally(filtered,'role')} total={n} />
+                <BarChart title="AI Tools Used" counts={tally(filtered,'aiToolsUsed')} total={n} />
+                <BarChart title="Usage Frequency" counts={tally(filtered,'usageFrequency')} total={n} />
+                <BarChart title="Comfort Scale (1–10)" counts={tally(filtered,'comfortScale')} total={n} />
+                <BarChart title="AI Career Importance (1–10)" counts={tally(filtered,'aiCareerImportance')} total={n} />
+                <BarChart title="Interest: Build Apps with AI (1–10)" counts={tally(filtered,'buildAppsInterest')} total={n} />
               </>
             )}
 
             {/* All charts tab */}
             {tab === 'charts' && (
               <>
-                <BarChart title="Current Role" counts={tally(responses, 'role')} total={n} />
-                <BarChart title="AI Tools Used" counts={tally(responses, 'aiToolsUsed')} total={n} />
-                <BarChart title="Usage Frequency" counts={tally(responses, 'usageFrequency')} total={n} />
-                <BarChart title="Used AI For" counts={tally(responses, 'usedFor')} total={n} />
-                <BarChart title="Comfort Scale (1–10)" counts={tally(responses, 'comfortScale')} total={n} />
-                <BarChart title="Feelings About AI" counts={tally(responses, 'feelings')} total={n} />
-                <BarChart title="Primary Career Goal" counts={tally(responses, 'careerGoal')} total={n} />
-                <BarChart title="AI Career Importance (1–10)" counts={tally(responses, 'aiCareerImportance')} total={n} />
-                <BarChart title="Want to Learn" counts={tally(responses, 'wantToLearn')} total={n} />
+                <BarChart title="Current Role" counts={tally(filtered,'role')} total={n} />
+                <BarChart title="AI Tools Used" counts={tally(filtered,'aiToolsUsed')} total={n} />
+                <BarChart title="Usage Frequency" counts={tally(filtered,'usageFrequency')} total={n} />
+                <BarChart title="Used AI For" counts={tally(filtered,'usedFor')} total={n} />
+                <BarChart title="Comfort Scale (1–10)" counts={tally(filtered,'comfortScale')} total={n} />
+                <BarChart title="Feelings About AI" counts={tally(filtered,'feelings')} total={n} />
+                <BarChart title="Primary Career Goal" counts={tally(filtered,'careerGoal')} total={n} />
+                <BarChart title="AI Career Importance (1–10)" counts={tally(filtered,'aiCareerImportance')} total={n} />
+                <BarChart title="Interest: Build Apps with AI (1–10)" counts={tally(filtered,'buildAppsInterest')} total={n} />
+                <BarChart title="Want to Learn" counts={tally(filtered,'wantToLearn')} total={n} />
               </>
             )}
 
@@ -520,10 +555,10 @@ function Dashboard({ onBack }) {
               <>
                 <div style={{ marginBottom: '1.5rem' }}>
                   <div style={{ fontWeight: '700', marginBottom: '0.8rem', color: '#333', fontSize: '1rem' }}>Biggest Concern About AI</div>
-                  {responses.filter((r) => r.biggestConcern?.trim()).length === 0 && (
+                  {filtered.filter((r) => r.biggestConcern?.trim()).length === 0 && (
                     <p style={{ color: '#999', fontStyle: 'italic' }}>No responses yet.</p>
                   )}
-                  {responses.filter((r) => r.biggestConcern?.trim()).map((r) => (
+                  {filtered.filter((r) => r.biggestConcern?.trim()).map((r) => (
                     <div key={r.id} style={{ ...s.dashCard, marginBottom: '0.7rem' }}>
                       <div style={{ fontWeight: '600', color: '#4a6fa5', marginBottom: '0.3rem', fontSize: '0.88rem' }}>{r.firstName} · {r.field}</div>
                       <div style={{ color: '#333', lineHeight: '1.5' }}>{r.biggestConcern}</div>
@@ -532,10 +567,10 @@ function Dashboard({ onBack }) {
                 </div>
                 <div>
                   <div style={{ fontWeight: '700', marginBottom: '0.8rem', color: '#333', fontSize: '1rem' }}>What Would Make This Course Most Valuable</div>
-                  {responses.filter((r) => r.mostValuable?.trim()).length === 0 && (
+                  {filtered.filter((r) => r.mostValuable?.trim()).length === 0 && (
                     <p style={{ color: '#999', fontStyle: 'italic' }}>No responses yet.</p>
                   )}
-                  {responses.filter((r) => r.mostValuable?.trim()).map((r) => (
+                  {filtered.filter((r) => r.mostValuable?.trim()).map((r) => (
                     <div key={r.id} style={{ ...s.dashCard, marginBottom: '0.7rem' }}>
                       <div style={{ fontWeight: '600', color: '#4a6fa5', marginBottom: '0.3rem', fontSize: '0.88rem' }}>{r.firstName} · {r.field}</div>
                       <div style={{ color: '#333', lineHeight: '1.5' }}>{r.mostValuable}</div>
@@ -558,6 +593,8 @@ export default function App() {
   const [data, setData] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  const classCode = (new URLSearchParams(window.location.search).get('class') || '').trim() || 'Unassigned';
 
   const update = (patch) => setData((d) => ({ ...d, ...patch }));
   const currentSection = SECTIONS[section];
@@ -584,7 +621,7 @@ export default function App() {
       const res = await fetch('/api/responses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, class: classCode }),
       });
       if (!res.ok) throw new Error('Server error');
       setScreen('thanks');
@@ -622,11 +659,14 @@ export default function App() {
             <em>Professional Readiness in the Age of AI</em>
           </p>
           <p style={s.subtitle}>
-            Before we get started, I want to know where you're coming from — what you've tried, how you're feeling about it, and what you actually need from this course.
+            Before we get started, I want to know where you're coming from — what AI tools you've tried, how you're feeling about it, and what you actually need from this course.
           </p>
           <p style={s.subtitle}>
             This takes about 5–7 minutes. Your answers are confidential and go directly to your instructor. No grades attached to this.
           </p>
+          {classCode !== 'Unassigned' && (
+            <div style={s.sectionTag}>Class: {classCode}</div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
           <button style={{ ...s.btn, flex: 1 }} onClick={() => setScreen('survey')}>

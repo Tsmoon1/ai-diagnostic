@@ -61,16 +61,19 @@ app.get('/api/responses/csv', (req, res) => {
   if (req.query.password !== PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  const responses = loadResponses();
+  let responses = loadResponses();
+  if (req.query.class) {
+    responses = responses.filter((r) => (r.class || 'Unassigned') === req.query.class);
+  }
   if (responses.length === 0) {
     return res.send('No responses yet.');
   }
 
   const headers = [
-    'Timestamp', 'First Name', 'Role', 'Field',
+    'Timestamp', 'Class', 'First Name', 'Role', 'Field',
     'AI Tools Used', 'Usage Frequency', 'Used For',
     'Comfort Scale', 'Feelings', 'Biggest Concern',
-    'Career Goal', 'AI Career Importance', 'Want to Learn',
+    'Career Goal', 'AI Career Importance', 'Interest: Build Apps with AI', 'Want to Learn',
     'Most Valuable For You',
   ];
 
@@ -82,6 +85,7 @@ app.get('/api/responses/csv', (req, res) => {
 
   const rows = responses.map((r) => [
     escape(r.timestamp),
+    escape(r.class || 'Unassigned'),
     escape(r.firstName),
     escape(r.role),
     escape(r.field),
@@ -93,6 +97,7 @@ app.get('/api/responses/csv', (req, res) => {
     escape(r.biggestConcern),
     escape(r.careerGoal),
     escape(r.aiCareerImportance),
+    escape(r.buildAppsInterest),
     escape(r.wantToLearn),
     escape(r.mostValuable),
   ].join(','));
